@@ -22,6 +22,9 @@ const CODE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = path.join(CODE_DIR, 'src');
 const DEFAULTS_DIR = path.join(SRC_DIR, 'defaults');
 const ROUTE = '/memory-tree';
+const REFRESH_ROUTE = '/memory-tree/refresh';
+/** 手动刷新必须带这个头：同源页面才拿得到这个值，跨站请求带不上自定义头。 */
+const REFRESH_HEADER = 'x-dsh-memory-tree';
 const DEFAULT_DATA_DIR = path.join(os.homedir(), '.dsh', 'memory');
 
 const PENDING_PAGE = `<!doctype html><meta charset="utf-8">
@@ -143,6 +146,36 @@ export function apply(ctx, config = {}) {
       }
     },
   }), 'dsh-memory-tree: page route');
+
+  // 手动刷新：面板上的按钮走这条。带一个守卫头，别的页面不能跨站触发。
+  let refreshing = false;
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: REFRESH_ROUTE,
+    handler: async (req, res) => {
+      const sendJson = (status, payload) => {
+        const body = JSON.stringify(payload);
+        res.writeHead(status, {
+          'content-type': 'application/json; charset=utf-8',
+          'content-length': Buffer.byteLength(body),
+          'cache-control': 'no-store',
+        });
+        res.end(body);
+      };
+      if (req.method !== 'POST') return sendJson(405, { ok: false, error: 'POST only' });
+      if (req.headers[REFRESH_HEADER] !== '1') return sendJson(403, { ok: false, error: 'missing header' });
+      if (refreshing) return sendJson(429, { ok: false, error: 'a refresh is already running' });
+
+      refreshing = true;
+      try {
+        const result = await run('refresh.mjs', [], env);
+        if (!result.ok) return sendJson(500, { ok: false, error: result.error.trim().slice(-1500) });
+        sendJson(200, { ok: true, output: result.stdout.trim() });
+      } finally {
+        refreshing = false;
+      }
+    },
+  }), 'dsh-memory-tree: refresh route');
 
   // 首次启动：库还不存在就后台跑一次完整刷新
   ctx.effect(() => {

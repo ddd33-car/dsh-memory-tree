@@ -19,6 +19,8 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-memory-tree'
     const PAGE_PATH = '/memory-tree'
+    const REFRESH_PATH = '/memory-tree/refresh'
+    const REFRESH_HEADER = 'x-dsh-memory-tree'
     const PANEL_ID = 'memory-tree'
     const HOME_PANEL = 'conversation'
 
@@ -28,6 +30,9 @@ window.__ModuleLoader__.load({
       title: '记忆之树',
       back: '返回对话',
       popout: '新窗口',
+      refresh: '刷新',
+      refreshing: '刷新中…',
+      refreshFailed: '刷新失败',
     }
 
     const en = {
@@ -36,6 +41,9 @@ window.__ModuleLoader__.load({
       title: 'Memory tree',
       back: 'Back to chat',
       popout: 'New window',
+      refresh: 'Refresh',
+      refreshing: 'Refreshing…',
+      refreshFailed: 'Refresh failed',
     }
 
     const CSS = `
@@ -102,9 +110,37 @@ window.__ModuleLoader__.load({
         )
       }
 
-      /** Centre panel: toolbar with a way back, then the generated page. */
+      /** Centre panel: toolbar with a way back, a manual refresh, then the page. */
       const TreePage = (props) => {
         const t = typeof props.t === 'function' ? props.t : (key) => key
+        const frame = React.useRef(null)
+        const [busy, setBusy] = React.useState(false)
+        const [note, setNote] = React.useState('')
+
+        const refresh = async () => {
+          if (busy) return
+          setBusy(true)
+          setNote(t('refreshing'))
+          try {
+            const response = await fetch(REFRESH_PATH, {
+              method: 'POST',
+              headers: { [REFRESH_HEADER]: '1' },
+            })
+            const data = await response.json().catch(() => ({}))
+            if (!response.ok || !data.ok) {
+              setNote(t('refreshFailed') + (data.error ? '：' + data.error : ''))
+              return
+            }
+            setNote('')
+            // 同源，直接重载当前页，保留 ?demo=1 之类的状态
+            frame.current?.contentWindow?.location.reload()
+          } catch (error) {
+            setNote(t('refreshFailed') + '：' + (error?.message ?? error))
+          } finally {
+            setBusy(false)
+          }
+        }
+
         return h('div', { className: 'dshtree_page' },
           h('style', null, CSS),
           h('div', { className: 'dshtree_bar' },
@@ -113,7 +149,13 @@ window.__ModuleLoader__.load({
               className: 'dshtree_bar_button',
               onClick: () => select(HOME_PANEL),
             }, '← ' + t('back')),
-            h('span', { className: 'dshtree_bar_title' }, t('title')),
+            h('span', { className: 'dshtree_bar_title' }, note || t('title')),
+            h('button', {
+              type: 'button',
+              className: 'dshtree_bar_button',
+              disabled: busy,
+              onClick: refresh,
+            }, busy ? t('refreshing') : t('refresh')),
             h('button', {
               type: 'button',
               className: 'dshtree_bar_button',
@@ -126,7 +168,7 @@ window.__ModuleLoader__.load({
               },
             }, t('popout')),
           ),
-          h('iframe', { className: 'dshtree_frame', src: PAGE_PATH, title: t('title') }),
+          h('iframe', { ref: frame, className: 'dshtree_frame', src: PAGE_PATH, title: t('title') }),
         )
       }
 

@@ -65,6 +65,8 @@ Nothing is overwritten after the first run.
 ![Roots](docs/roots.png)
 
 - Click the trunk → the root system grows.
+- The panel toolbar has **← Back to chat**, **Refresh**, and **New window**. Refresh runs a
+  collection pass immediately instead of waiting for the timer, then reloads the page.
 - Click a month → its weeks branch out; click a week → its days.
 - Click a day → the right panel shows the keywords, the sessions, and what you and the
   assistant actually said.
