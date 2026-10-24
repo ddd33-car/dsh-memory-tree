@@ -1,0 +1,1262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>记忆之树</title>
+<style>
+  :root{ --bg:#07090a; --ink:#cfd6e0; --dim:#6b7482; }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;overflow:hidden}
+  #stage{position:fixed;inset:0;overflow:hidden}
+  #stage.ready{cursor:pointer}
+  #bg{position:absolute;inset:0;background:
+       radial-gradient(1200px 760px at 50% 26%, #0e1716 0%, transparent 66%),
+       radial-gradient(1500px 900px at 50% 112%, #0d0f0c 0%, transparent 70%)}
+  #cam{position:absolute;inset:0;transform-origin:0 0;will-change:transform;
+       transition:transform 1100ms cubic-bezier(.22,.61,.36,1)}
+  svg{display:block;overflow:visible}
+  .node{cursor:pointer}
+  .node:hover .hit{opacity:.14}
+  .hit{fill:#fff;opacity:0;transition:opacity .15s}
+  .lbl{font-size:13px;fill:#8e99a8;pointer-events:none;user-select:none;
+       font-variant-numeric:tabular-nums;transition:fill .2s,opacity .4s}
+  .node:hover .lbl{fill:#eef3f9}
+  .lbl.big{font-size:15px;fill:#c2ccd9}
+  .lbl.deep{fill:#d8a24a}
+  .lbl.dim{opacity:.12 !important}
+  .daylbl{font-size:12px}
+
+  #hud{position:fixed;left:28px;top:24px;z-index:5;pointer-events:none}
+  #hud h1{margin:0;font-size:15px;font-weight:600;letter-spacing:.14em;color:#c8d2df}
+  #hud .sub{margin-top:6px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;letter-spacing:.03em}
+  #t-demo{position:fixed;left:28px;top:98px;z-index:6;background:rgba(17,24,32,.72);border:1px solid #232c38;
+          color:#a9b6c6;padding:5px 12px;border-radius:14px;font:inherit;font-size:12px;cursor:pointer;
+          transition:.18s;backdrop-filter:blur(6px);letter-spacing:.06em}
+  #t-demo:hover{background:#1b2431;color:#e6eef8;border-color:#334154}
+  body.panel-open #t-demo{opacity:0;pointer-events:none}
+  #crumb{position:fixed;left:50%;top:24px;transform:translateX(-50%);z-index:5;
+         font-size:12px;color:var(--dim);letter-spacing:.12em;pointer-events:none}
+  #crumb b{color:#b3bfcd;font-weight:500}
+  #hint{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:5;
+        font-size:12.5px;color:#77828f;letter-spacing:.12em;pointer-events:none;transition:opacity .6s}
+  #hint b{color:#c3ccd8;font-weight:500}
+  #tools{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:6;display:flex;gap:8px}
+  #tools button{background:rgba(17,24,32,.72);border:1px solid #232c38;color:#a9b6c6;
+                padding:6px 15px;border-radius:18px;font-size:12.5px;cursor:pointer;
+                transition:.18s;backdrop-filter:blur(6px);letter-spacing:.06em}
+  #tools button:hover{background:#1b2431;color:#e6eef8;border-color:#334154}
+  #tools button.on{background:#20303f;color:#dbe7f5;border-color:#3d5670}
+  #back{position:fixed;left:28px;bottom:26px;z-index:6;display:none;
+        background:rgba(18,23,30,.7);border:1px solid #232c38;color:#aab6c6;
+        padding:7px 15px;border-radius:20px;font-size:12.5px;cursor:pointer;transition:.2s;
+        backdrop-filter:blur(6px)}
+  #back:hover{background:#1a222c;color:#e3eaf2}
+  #back.on{display:block}
+
+  #panel{position:fixed;top:0;right:0;height:100%;width:min(470px,92vw);z-index:8;
+         background:linear-gradient(180deg,rgba(13,17,22,.97),rgba(8,10,13,.99));
+         border-left:1px solid #1d242e;transform:translateX(102%);
+         transition:transform 460ms cubic-bezier(.22,.61,.36,1);
+         display:flex;flex-direction:column;box-shadow:-40px 0 80px rgba(0,0,0,.55);
+         backdrop-filter:blur(10px)}
+  #panel.open{transform:none}
+  #panel header{padding:22px 24px 14px;border-bottom:1px solid #171d26;position:relative}
+  #panel h2{margin:0;font-size:17px;font-weight:600;color:#e6ecf4;letter-spacing:.02em}
+  #panel .meta{margin-top:6px;font-size:12px;color:var(--dim)}
+  #panel .body{overflow-y:auto;padding:16px 24px 40px;flex:1}
+  #panel .body::-webkit-scrollbar{width:8px}
+  #panel .body::-webkit-scrollbar-thumb{background:#232c38;border-radius:4px}
+  .tag{display:inline-block;background:#151b23;border:1px solid #232c38;border-radius:6px;
+       padding:1px 8px;margin:0 5px 5px 0;font-size:11.5px;color:#8e99a8}
+  .tag.deep{color:#d8a24a;border-color:#3d3020;background:#1a1510}
+  .sec{margin:18px 0 6px;font-size:11px;letter-spacing:.12em;color:#5f6874}
+  .row{display:flex;gap:10px;padding:4px 0;font-size:13px;align-items:baseline}
+  .row time{color:#4f5967;font-size:11.5px;flex:0 0 auto;font-variant-numeric:tabular-nums}
+  .me{color:#c9d2e0}
+  .ai{color:#8b9aad}
+  #close{position:absolute;right:16px;top:16px;background:none;border:none;color:#6b7482;
+         font-size:22px;cursor:pointer;line-height:1}
+  #close:hover{color:#dfe6ef}
+  #facts{position:fixed;right:28px;top:24px;z-index:5;max-width:240px;text-align:right;pointer-events:none}
+  #facts .t{font-size:10.5px;color:#4a535f;letter-spacing:.14em;margin-bottom:5px}
+  #facts .f{font-size:11.5px;color:#76808d;margin-bottom:4px;line-height:1.45;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body.panel-open #facts, body.panel-open #hint{opacity:0 !important;transition:opacity .3s}
+  #pulse{animation:pulse 3.4s ease-in-out infinite;transform-origin:800px 690px}
+  @keyframes pulse{0%,100%{opacity:.10;transform:scale(1)}50%{opacity:.34;transform:scale(1.6)}}
+  .arrow{cursor:pointer}
+  .arrow .ring{fill:#111820;stroke:#2b3441;stroke-width:1;transition:.18s}
+  .arrow .chev{stroke:#8496aa;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round;transition:.18s}
+  .arrow.quiet{opacity:0 !important;transition:opacity .2s}
+  .node:hover .arrow.quiet{opacity:1 !important}
+  .arrow:hover .ring{fill:#1d2632;stroke:#42506a}
+  .arrow:hover .chev{stroke:#e8f0fa}
+
+  /* 今天：一圈往外散的呼吸环 */
+  .lbl.today{fill:#7fd6b4}
+  .yearmark{font-size:108px;font-weight:700;letter-spacing:.1em;fill:#d8e3f1;opacity:.15;user-select:none}
+  .today-ring{fill:none;stroke:#6fcaa6;stroke-width:1.4;transform-box:fill-box;
+              transform-origin:center;animation:todayPulse 3.2s ease-out infinite;pointer-events:none}
+  @keyframes todayPulse{
+    0%{opacity:.6;transform:scale(.8)}
+    70%{opacity:0;transform:scale(2.4)}
+    100%{opacity:0;transform:scale(2.4)}
+  }
+
+  /* 图例 */
+  #legend{position:fixed;right:28px;bottom:28px;z-index:5;display:flex;gap:16px;
+          font-size:11.5px;color:#69737f;letter-spacing:.08em;pointer-events:none;
+          transition:opacity .35s}
+  #legend span{display:inline-flex;align-items:center;gap:6px}
+  #legend i{display:inline-block;width:15px;height:2px;border-radius:2px;background:currentColor;opacity:.95}
+  #legend .deep{color:#d8a24a}
+  #legend .normal{color:#8fa0ae}
+  #legend .faint{color:#4e5764}
+  #legend .today{color:#6fcaa6}
+  body.panel-open #legend{opacity:0}
+
+  /* 悬停时的一行预览 */
+  #tip{position:fixed;left:0;top:0;z-index:9;pointer-events:none;padding:5px 11px;border-radius:9px;
+       background:rgba(11,15,20,.93);border:1px solid #263140;color:#c3cddb;font-size:12px;
+       letter-spacing:.04em;white-space:nowrap;opacity:0;transition:opacity .14s;
+       box-shadow:0 8px 22px rgba(0,0,0,.55)}
+  #tip.on{opacity:1}
+  body.panel-open #tip{opacity:0}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="bg"></div>
+  <div id="cam"><svg id="tree" width="1600" height="1600" viewBox="0 0 1600 1600"></svg></div>
+</div>
+
+<div id="hud">
+  <h1>记忆之树</h1>
+  <div class="sub" id="stat"></div>
+</div>
+<button id="t-demo">演示版</button>
+<div id="facts"></div>
+<div id="tip"></div>
+<div id="crumb"></div>
+<div id="hint">点一下<b>树干</b>，让它长出根</div>
+<div id="legend">
+  <span><i class="deep"></i>深刻</span>
+  <span><i class="normal"></i>普通</span>
+  <span><i class="faint"></i>淡忘</span>
+  <span><i class="today"></i>今天</span>
+</div>
+<div id="tools">
+  <button id="t-all">全览</button>
+  <button id="t-roots">根系</button>
+  <button id="t-today">今天</button>
+  <button id="t-top">回到树</button>
+</div>
+<button id="back">← 返回</button>
+
+<div id="panel">
+  <button id="close">×</button>
+  <header><h2 id="p-title"></h2><div class="meta" id="p-meta"></div></header>
+  <div class="body" id="p-body"></div>
+</div>
+
+<script>
+const DATA = window.__MEMORY__;
+// 同一张页面带两份数据：真实库，和 12 个月的演示库（?demo=1）
+const IS_DEMO = /(?:^|[?&])demo=1/.test(location.search) && !!DATA.demo;
+const T = IS_DEMO ? DATA.demo : DATA.real;
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('tree');
+const cam = document.getElementById('cam');
+const stage = document.getElementById('stage');
+
+const CX = 800, GROUND_Y = 690, ROOT_Y = 690;
+const FAST = location.hash.length > 1 && location.hash.slice(1) !== 'A';
+if (FAST || location.hash.slice(1) === 'A') cam.style.transition = 'none';
+
+const el = (n, a = {}) => {
+  const e = document.createElementNS(NS, n);
+  for (const k in a) e.setAttribute(k, a[k]);
+  return e;
+};
+
+const defs = el('defs');
+svg.appendChild(defs);
+const gTree = el('g'), gMonths = el('g'), gWeeks = el('g'), gDays = el('g');
+let gFlow = null;                 // 顺着根往上爬的光点
+const flowPaths = [];
+let state = { level: 0, month: null, week: null };
+let trunkNode = null;
+
+const rng = (seed) => {
+  let s = seed >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+};
+const stop = (o, c, op) => el('stop', { offset: o, 'stop-color': c, 'stop-opacity': op ?? 1 });
+
+// ── 场景 ──────────────────────────────────────────────────────────────
+// 我喜欢的样子：墨色的树，雾里的根，只有「深刻」的日子是暖色。
+// 树冠不做成一堆圆，而是用「带波浪边的闭合形」拼轮廓——像剪影，不像气球。
+function blobPath(cx, cy, rx, ry, bumps, R, phase) {
+  let d = '';
+  for (let i = 0; i < bumps; i++) {
+    const a0 = phase + (i / bumps) * Math.PI * 2;
+    const a1 = phase + ((i + 1) / bumps) * Math.PI * 2;
+    const am = (a0 + a1) / 2;
+    const k = 1.10 + R() * 0.12;
+    const p0 = [cx + Math.cos(a0) * rx, cy + Math.sin(a0) * ry];
+    const mid = [cx + Math.cos(am) * rx * k, cy + Math.sin(am) * ry * k];
+    const p1 = [cx + Math.cos(a1) * rx, cy + Math.sin(a1) * ry];
+    d += (i === 0 ? 'M ' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) : '') +
+      ' Q ' + mid[0].toFixed(1) + ' ' + mid[1].toFixed(1) + ' ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1);
+  }
+  return d + ' Z';
+}
+
+function drawTree() {
+  const sky = el('radialGradient', { id: 'sky', cx: '50%', cy: '26%', r: '78%' });
+  sky.append(stop('0%', '#16211f', 0.95), stop('46%', '#0c1214', 0.55), stop('100%', '#060808', 0));
+  defs.appendChild(sky);
+
+  const soil = el('linearGradient', { id: 'soil', x1: '0', y1: '0', x2: '0', y2: '1' });
+  soil.append(stop('0%', '#101210', 0), stop('10%', '#0d0f0d', 0.9), stop('42%', '#080908', 1), stop('100%', '#050606', 1));
+  defs.appendChild(soil);
+
+  const fog = el('linearGradient', { id: 'fog', x1: '0', y1: '0', x2: '0', y2: '1' });
+  fog.append(stop('0%', '#0a0d0c', 0), stop('50%', '#0a0d0c', 0.45), stop('100%', '#0a0d0c', 0.92));
+  defs.appendChild(fog);
+
+  const bark = el('linearGradient', { id: 'bark', x1: '0', y1: '0', x2: '1', y2: '0' });
+  bark.append(stop('0%', '#1c140e', 1), stop('34%', '#3a2b1e', 1), stop('55%', '#2d2117', 1), stop('100%', '#170f0b', 1));
+  defs.appendChild(bark);
+
+  const glow = el('radialGradient', { id: 'glow', cx: '50%', cy: '50%', r: '50%' });
+  glow.append(stop('0%', '#2f5a48', 0.14), stop('100%', '#2f5a48', 0));
+  defs.appendChild(glow);
+
+  // 根颈的软过渡：树干平底接粗根，别让接缝露成一条横线
+  const collar = el('radialGradient', { id: 'collar', cx: '50%', cy: '50%', r: '50%' });
+  collar.append(stop('0%', '#463320', 0.95), stop('58%', '#3f2c1a', 0.5), stop('100%', '#3f2c1a', 0));
+  defs.appendChild(collar);
+
+  const shade = el('radialGradient', { id: 'shade', cx: '50%', cy: '50%', r: '50%' });
+  shade.append(stop('0%', '#000', 0.5), stop('70%', '#000', 0.16), stop('100%', '#000', 0));
+  defs.appendChild(shade);
+
+  // 布景一律不接收点击——否则雾、地面这些盖在根上的薄层会把点击吃掉
+  const NOHIT = { 'pointer-events': 'none' };
+  gTree.appendChild(el('rect', { x: -600, y: -600, width: 2800, height: 1300, fill: 'url(#sky)', ...NOHIT }));
+  gTree.appendChild(el('rect', { x: -600, y: GROUND_Y - 120, width: 2800, height: 1800, fill: 'url(#soil)', ...NOHIT }));
+  gTree.appendChild(el('ellipse', { cx: 800, cy: GROUND_Y + 40, rx: 640, ry: 90, fill: 'url(#glow)', ...NOHIT }));
+
+  // 树冠：三个层次，后暗前亮
+  const R = rng(77123);
+  const crown = el('g', { 'pointer-events': 'none' });
+
+  const layer = (blobs, fill, op) => {
+    const g = el('g');
+    for (const b of blobs) {
+      g.appendChild(el('path', {
+        d: blobPath(b[0], b[1], b[2], b[3], b[4] ?? 16, R, R() * 6.28),
+        fill, opacity: op,
+      }));
+    }
+    crown.appendChild(g);
+    return g;
+  };
+
+  // 底层：把整个冠的轮廓铺出来
+  layer([[800, 262, 292, 118, 18], [658, 278, 172, 100, 15], [944, 274, 168, 98, 15],
+         [716, 372, 104, 62, 12], [886, 366, 108, 64, 12]], '#101d18', 0.98);
+  // 中层：分团，做出起伏
+  layer([[704, 206, 172, 100, 16], [886, 198, 180, 104, 16], [800, 140, 180, 94, 16],
+         [614, 298, 132, 78, 14], [984, 292, 130, 76, 14]], '#16261f', 0.97);
+  // 亮层：偏左上的受光面
+  layer([[742, 172, 134, 80, 15], [862, 154, 126, 74, 15], [668, 244, 104, 64, 14],
+         [952, 236, 100, 60, 14]], '#1e352b', 0.96);
+  layer([[772, 130, 92, 56, 14], [694, 162, 72, 46, 13], [906, 168, 68, 42, 13]], '#264536', 0.9);
+
+  // 枝：递归生成，画在树冠之前，所以只有下半截的 V 形露出来
+  const branches = [];
+  (function grow(x, y, ang, len, wid, depth) {
+    const pts = [[x, y]];
+    let a = ang, cx = x, cy = y;
+    for (let i = 0; i < 4; i++) {
+      a += (R() - 0.5) * 0.14;
+      cx += Math.cos(a) * (len / 4);
+      cy += Math.sin(a) * (len / 4);
+      pts.push([cx, cy]);
+    }
+    branches.push({ pts, wid });
+    if (depth <= 0) return;
+    for (let k = 0; k < 3; k++) {
+      grow(cx, cy, a + (k - 1) * 0.62 + (R() - 0.5) * 0.2, len * 0.66, wid * 0.58, depth - 1);
+    }
+  })(800, 452, -Math.PI / 2, 128, 17, 2);
+
+  // 树干：根部外扩与主干是同一个形体，上细下粗
+  trunkNode = el('path', {
+    d: 'M 763 704 C 769 648 778 596 784 552 C 790 508 792 466 792 408 ' +
+       'C 792 392 793 382 794 372 L 806 372 C 807 382 808 392 808 408 ' +
+       'C 808 466 810 508 816 552 C 822 596 831 648 837 704 Z',
+    fill: 'url(#bark)',
+  });
+  gTree.appendChild(trunkNode);
+
+  // 背光面：给树干一点圆柱的明暗
+  gTree.appendChild(el('path', {
+    d: 'M 806 372 C 807 382 808 392 808 408 C 808 466 810 508 816 552 C 822 596 831 648 837 704 L 820 704 ' +
+       'C 817 650 810 600 805 556 C 801 512 798 468 796 408 C 796 392 796 382 796 372 Z',
+    fill: '#150e09', opacity: 0.5,
+  }));
+
+  // 板根不要了：那两条细尖看着像天线，根颈交给树干底部的外扩和几条粗根
+  gTree.appendChild(el('ellipse', {
+    cx: 800, cy: 704, rx: 58, ry: 34, fill: 'url(#collar)', 'pointer-events': 'none',
+  }));
+
+  for (const b of branches) {
+    const d = 'M ' + b.pts.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ');
+    gTree.appendChild(el('path', {
+      d, stroke: '#2a1f16', 'stroke-width': Math.max(1, b.wid), fill: 'none',
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.95, 'pointer-events': 'none',
+    }));
+  }
+
+  gTree.appendChild(crown);
+
+  // 左上来的暖光：树冠受光的一面和树干左边被照亮的一道边
+  const rimG = el('radialGradient', { id: 'rimG', cx: '50%', cy: '50%', r: '50%' });
+  rimG.append(stop('0%', '#ffe3ae', 0.3), stop('55%', '#ffe3ae', 0.09), stop('100%', '#ffe3ae', 0));
+  defs.appendChild(rimG);
+  gTree.appendChild(el('ellipse', {
+    cx: 646, cy: 168, rx: 236, ry: 142, fill: 'url(#rimG)', 'pointer-events': 'none',
+  }));
+  const trunkRim = el('linearGradient', { id: 'trunkRim', x1: '0', y1: '0', x2: '1', y2: '0' });
+  trunkRim.append(stop('0%', '#ffd9a0', 0.32), stop('38%', '#ffd9a0', 0.06), stop('100%', '#ffd9a0', 0));
+  defs.appendChild(trunkRim);
+  gTree.appendChild(el('path', {
+    d: 'M 786 700 C 780 600 778 500 786 392 L 794 392 C 788 500 790 600 795 700 Z',
+    fill: 'url(#trunkRim)', 'pointer-events': 'none',
+  }));
+
+  // 年份：刻在树冠中间当水印，不接收点击
+  const yearMark = el('text', {
+    x: 800, y: 252, class: 'yearmark', 'text-anchor': 'middle',
+    'dominant-baseline': 'middle', 'pointer-events': 'none',
+  });
+  yearMark.textContent = T.year;
+  gTree.appendChild(yearMark);
+
+  // 地面与雾
+  // 地面线去掉：那条横线在暗背景上太硬
+
+  gTree.appendChild(el('ellipse', { cx: 800, cy: GROUND_Y + 6, rx: 300, ry: 26, fill: 'url(#shade)', 'pointer-events': 'none' }));
+  gTree.appendChild(el('rect', { x: -300, y: GROUND_Y - 10, width: 2200, height: 620, fill: 'url(#fog)', 'pointer-events': 'none' }));
+
+  const pulse = el('circle', { cx: 800, cy: GROUND_Y, r: 30, fill: 'none', stroke: '#7d6a4c', 'stroke-width': 1.3 });
+  pulse.setAttribute('id', 'pulse');
+  gTree.appendChild(pulse);
+
+  // 光点：暖色的小亮点，带一圈光晕
+  const spark = el('radialGradient', { id: 'spark', cx: '50%', cy: '50%', r: '50%' });
+  spark.append(stop('0%', '#fff3cf', 0.9), stop('34%', '#ffd98a', 0.45), stop('100%', '#ffd98a', 0));
+  defs.appendChild(spark);
+  gFlow = el('g', { 'pointer-events': 'none' });
+  gTree.appendChild(gFlow);
+
+  // 树干也是"流"的一段：光点沿它从根颈升到树冠
+  registerFlow(TRUNK_PATH, true);
+
+  // 树冠里的光尘：不接收点击，慢慢浮
+  gMotes = el('g', { 'pointer-events': 'none' });
+  gTree.appendChild(gMotes);
+  buildMotes();
+  if (!flowTimer) flowTimer = setInterval(tickFlow, 40);
+
+  svg.appendChild(gTree);
+}
+
+// ── 相机 ──────────────────────────────────────────────────────────────
+function focus(x0, y0, x1, y1, pad = 1.2) {
+  const W = innerWidth, H = innerHeight;
+  const w = Math.max(80, x1 - x0), h = Math.max(80, y1 - y0);
+  const s = Math.min(W / (w * pad), H / (h * pad), 2.6);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  cam.style.transform = 'translate(' + (W / 2 - cx * s) + 'px,' + (H / 2 - cy * s) + 'px) scale(' + s + ')';
+  return s;
+}
+
+// ── 根 ────────────────────────────────────────────────────────────────
+function windingRoot(parent, start, angle, length, w0, w1, color, opts = {}) {
+  const R = rng(opts.seed ?? 1);
+  const steps = opts.steps ?? 44;
+  const to = opts.to; // 有目标点时往回拽，保证落在指定位置
+  let a = angle, x = start[0], y = start[1];
+  const seg = length / steps;
+  const pts = [[x, y]];
+
+  for (let i = 0; i < steps; i++) {
+    const t = i / steps;
+    let steer = 0;
+    if (to) {
+      const want = Math.atan2(to[1] - y, to[0] - x);
+      let d = want - a;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      steer = d * (opts.steer ?? 0.5); // 越走越贴目标
+    }
+    // 月根走到后段要「收着点」，不然挂在上面的周根会互相压
+    const damp = opts.damp ? Math.max(0.2, 1 - t / opts.damp) : 1;
+    a += Math.sin(t * 5.6 + (opts.seed ?? 0) * 0.8) * 0.07 * (opts.wob ?? 1) * damp +
+      (R() - 0.5) * 0.04 * (opts.wob ?? 1) * damp + steer +
+      (to ? 0 : (Math.PI / 2 - a) * (opts.grav ?? 0.05));
+    // 硬弯：真根不会一条弧线走到底，中间总要别一下
+    if (opts.kink != null && Math.abs(t - opts.kink) < 0.018) a += (opts.kinkDir ?? 1) * (opts.kinkAmt ?? 0.38);
+    x += Math.cos(a) * seg;
+    y += Math.sin(a) * seg;
+    pts.push([x, y]);
+  }
+
+  const g = el('g');
+  const segs = [];
+  for (let i = 0; i < steps; i++) {
+    const t = i / steps;
+    const base = w1 + (w0 - w1) * Math.pow(1 - t, opts.taper ?? 1.55);
+    const bulge = 1 + 0.20 * Math.sin(t * 11 + (opts.seed ?? 0) * 1.3);
+    const seg = el('path', {
+      d: 'M ' + pts[i][0].toFixed(1) + ' ' + pts[i][1].toFixed(1) + ' L ' + pts[i + 1][0].toFixed(1) + ' ' + pts[i + 1][1].toFixed(1),
+      stroke: color, 'stroke-width': Math.max(0.5, base * bulge), 'stroke-linecap': 'round', fill: 'none',
+      opacity: FAST ? (opts.opacity ?? 1) : 0,
+    });
+    g.appendChild(seg);
+    segs.push(seg);
+  }
+
+  const d = 'M ' + pts.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ');
+
+  const hairs = opts.hairs ?? 0;
+  for (let k = 0; k < hairs; k++) {
+    // 根须位置、朝向、长短都随机，别排成一排
+    const t = 0.12 + R() * 0.86;
+    const i = Math.min(steps - 1, Math.floor(t * steps));
+    const base = pts[i];
+    const dirA = Math.atan2(pts[i + 1][1] - base[1], pts[i + 1][0] - base[0]);
+    const side = R() < 0.5 ? 1 : -1;
+    const ha = dirA + side * (0.55 + R() * 0.85);
+    const hl = (opts.hairLen ?? 20) * (1.15 - t * 0.55) * (0.55 + R() * 0.95);
+    const midA = ha + side * 0.3;
+    const h = el('path', {
+      d: 'M ' + base[0] + ' ' + base[1] +
+         ' Q ' + (base[0] + Math.cos(ha) * hl * 0.55 + Math.cos(midA) * hl * 0.2) + ' ' +
+                 (base[1] + Math.sin(ha) * hl * 0.55 + Math.sin(midA) * hl * 0.2) + ' ' +
+                 (base[0] + Math.cos(midA) * hl) + ' ' + (base[1] + Math.sin(midA) * hl),
+      stroke: opts.hairColor ?? color, 'stroke-width': (opts.hairW ?? 1.2) * (1.2 - t * 0.6),
+      fill: 'none', 'stroke-linecap': 'round', opacity: (opts.opacity ?? 1) * 0.6,
+    });
+    g.appendChild(h);
+    hairFade(h, opts.delay ?? 0, t);
+  }
+
+  return { g, d, pts, w0, segs, op: opts.opacity ?? 1, end: pts[pts.length - 1], angle: a };
+}
+
+// 生长：沿根的长度依次点亮每一小段。
+// 用定时器而不是 requestAnimationFrame —— rAF 在后台标签和无头环境里会被节流，
+// 一旦被节流，根就永远停在「没长出来」的状态。
+function fadeRoot(root, delay, dur) {
+  const segs = root.segs || [];
+  if (FAST || !segs.length) return;
+  const n = segs.length;
+  const start = Date.now() + delay;
+  const timer = setInterval(() => {
+    const t = Math.min(1, Math.max(0, (Date.now() - start) / dur));
+    for (let i = 0; i < n; i++) {
+      const head = t * 1.3 - (i / n) * 0.8;
+      segs[i].setAttribute('opacity', String(Math.max(0, Math.min(1, head * 2.4)) * root.op));
+    }
+    if (t >= 1) clearInterval(timer);
+  }, 40);
+}
+
+let maskSeq = 0;
+function revealMask(root, delay, dur) {
+  const id = 'rm' + maskSeq++;
+  const mask = el('mask', { id, maskUnits: 'userSpaceOnUse', x: -800, y: -800, width: 3200, height: 3200 });
+  const rev = el('path', {
+    d: root.d, stroke: '#fff', 'stroke-width': Math.max(6, root.w0 * 2.6),
+    fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+  });
+  mask.appendChild(rev);
+  defs.appendChild(mask);
+
+  const wrap = el('g', { mask: 'url(#' + id + ')' });
+  wrap.appendChild(root.g);
+
+  if (!FAST) {
+    // 不用 CSS transition：遮罩里的元素不一定会触发过渡，改用 rAF 手动推进
+    const len = rev.getTotalLength() || 1;
+    rev.style.strokeDasharray = len;
+    rev.style.strokeDashoffset = len;
+    const start = performance.now() + delay;
+    const tick = (now) => {
+      const t = Math.min(1, Math.max(0, (now - start) / dur));
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      rev.style.strokeDashoffset = len * (1 - e);
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  return wrap;
+}
+
+function hairFade(path, delay, t) {
+  if (FAST) return;
+  path.style.opacity = 0;
+  path.style.transition = 'opacity .5s';
+  setTimeout(() => (path.style.opacity = 0.6), delay + 500 + t * 700);
+}
+
+function arrowBtn(onClick) {
+  const g = el('g', { class: 'arrow' });
+  g.appendChild(el('circle', { r: 15, fill: 'transparent' }));
+  g.appendChild(el('circle', { class: 'ring', r: 9 }));
+  g.appendChild(el('path', { class: 'chev', d: 'M -3.2 -1.5 L 0 1.7 L 3.2 -1.5' }));
+  g.addEventListener('click', (ev) => { ev.stopPropagation(); onClick(); });
+  return g;
+}
+const placeAt = (g, x, y) => g.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
+
+// 根末端的方向（用它把标签摆在根尖外侧，而不是随手往右一推）
+function endDir(pts) {
+  const a = pts[pts.length - 2], b = pts[pts.length - 1];
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const L = Math.hypot(dx, dy) || 1;
+  return [dx / L, dy / L];
+}
+
+
+// ── 标签排布 ──────────────────────────────────────────────────────────
+// 标签按「估算字宽」做几轮轻推，避免两张叠在一起。不用 getBBox：
+// 隐藏的组和离屏元素在某些环境里量出来是 0，估算反而稳定。
+const WIDE = /[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f]/;
+function txtW(t, size) {
+  let w = 0;
+  for (const ch of String(t)) w += WIDE.test(ch) ? 1 : 0.56;
+  return w * size;
+}
+function makeLabel(parent, txt, x, y, cls, size, arOff) {
+  const lbl = el('text', { x, y, class: cls, 'text-anchor': 'middle' });
+  lbl.textContent = txt;
+  if (size) lbl.style.fontSize = size + 'px';
+  parent.appendChild(lbl);
+  return { lbl, txt, size: size || 13, x0: x, y0: y, dx: 0, dy: 0, ar: null, arOff: arOff || null };
+}
+
+function separate(items, gap = 7, cap = 34, iters = 60) {
+  if (items.length < 2) return;
+  const box = items.map((it) => ({ w: txtW(it.txt, it.size) + gap, h: it.size * 1.45 + gap }));
+  for (let k = 0; k < iters; k++) {
+    let hit = false;
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i], b = items[j];
+        const ax = a.x0 + a.dx, ay = a.y0 + a.dy;
+        const bx = b.x0 + b.dx, by = b.y0 + b.dy;
+        const ox = (box[i].w + box[j].w) / 2 - Math.abs(ax - bx);
+        const oy = (box[i].h + box[j].h) / 2 - Math.abs(ay - by);
+        if (ox <= 0 || oy <= 0) continue;
+        hit = true;
+        // 从「叠得浅」的那个方向分开，一次最多挪 6px，免得标签跑得离根太远
+        if (ox < oy) {
+          const s = (ax < bx ? -1 : 1) * Math.min(ox / 2, 6);
+          a.dx += s; b.dx -= s;
+        } else {
+          const s = (ay < by ? -1 : 1) * Math.min(oy / 2, 6);
+          a.dy += s; b.dy -= s;
+        }
+      }
+    }
+    if (!hit) break;
+  }
+  for (const it of items) {
+    const r = Math.hypot(it.dx, it.dy);
+    if (r > cap) { it.dx *= cap / r; it.dy *= cap / r; }
+    const x = it.x0 + it.dx, y = it.y0 + it.dy;
+    it.lbl.setAttribute('x', x.toFixed(1));
+    it.lbl.setAttribute('y', y.toFixed(1));
+    // 箭头贴在文字右边：宽度是算出来的，不靠猜
+    if (it.ar && it.arOff) placeAt(it.ar, x + txtW(it.txt, it.size) / 2 + 17, y - 4.5);
+  }
+}
+
+// 取景：根尖 + 标签一起算包围盒，边缘的字就不会被裁掉
+function focusBox(points, items, pad = 1.0, minW = 340, minH = 260) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const add = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
+  for (const p of points) add(p[0], p[1]);
+  for (const it of items || []) {
+    const w = txtW(it.txt, it.size), h = it.size * 1.5;
+    const cx = it.x0 + it.dx, cy = it.y0 + it.dy;
+    add(cx - w / 2, cy - h * 0.8);
+    add(cx + w / 2, cy + h * 0.3);
+  }
+  if (!isFinite(x0)) return;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const w = Math.max(minW, x1 - x0), h = Math.max(minH, y1 - y0);
+  focus(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, pad);
+}
+
+// 层级专注：进到某层，就把上层的字和箭头收起来，画面让给当前层
+function setLabels(items, vis) {
+  for (const it of items) {
+    if (!it) continue;
+    // 用 display 而不是 opacity：.lbl.dim 带 !important，opacity 压不住
+    it.lbl.style.display = vis ? '' : 'none';
+    if (it.ar) {
+      it.ar.style.display = vis ? '' : 'none';
+      it.ar.style.pointerEvents = vis ? '' : 'none';
+    }
+  }
+}
+
+// 悬停预览
+const tipEl = document.getElementById('tip');
+function hoverTip(node, text) {
+  node.addEventListener('mouseenter', () => { tipEl.textContent = text; tipEl.classList.add('on'); });
+  node.addEventListener('mousemove', (ev) => {
+    const r = tipEl.getBoundingClientRect();
+    let x = ev.clientX + 16, y = ev.clientY + 18;
+    if (x + r.width > innerWidth - 10) x = ev.clientX - r.width - 14;
+    if (y + r.height > innerHeight - 10) y = ev.clientY - r.height - 14;
+    tipEl.style.left = x + 'px';
+    tipEl.style.top = y + 'px';
+  });
+  node.addEventListener('mouseleave', () => tipEl.classList.remove('on'));
+}
+
+
+// ── 沿根往上爬的光点 ─────────────────────────────────────────────────
+const FLOW_N = 56;
+const TRUNK_PATH = [[800, 704], [800, 630], [799, 550], [799, 470], [800, 392]];
+let flowParts = [], flowTimer = null;
+
+function registerFlow(pts, up) {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  }
+  const total = cum[cum.length - 1];
+  if (total > 30) flowPaths.push({ pts, cum, total, up: !!up });
+}
+
+function buildFlow() {
+  if (!gFlow) return;
+  gFlow.replaceChildren();
+  flowParts = [];
+  if (!flowPaths.length) return;
+  const N = Math.min(FLOW_N, Math.max(8, flowPaths.length * 5));
+  for (let i = 0; i < N; i++) {
+    const g = el('g');
+    g.appendChild(el('circle', { r: 7.5, fill: 'url(#spark)', opacity: 0.5 }));
+    g.appendChild(el('circle', { r: 2.1, fill: '#ffefc6' }));
+    gFlow.appendChild(g);
+    flowParts.push({
+      el: g,
+      p: flowPaths[Math.floor(Math.random() * flowPaths.length)],
+      t: Math.random(),
+      sp: 0.018 + Math.random() * 0.045,   // 每秒走完全程的比例：慢
+    });
+  }
+  placeFlow();
+  if (flowTimer) clearInterval(flowTimer);
+  flowTimer = setInterval(tickFlow, 40);
+}
+
+function placeFlow() {
+  for (const f of flowParts) {
+    const p = f.p;
+    // 根：从根尖往树干走；树干：从根颈往树冠走
+    const s = (p.up ? f.t : 1 - f.t) * p.total;
+    let i = 1;
+    while (i < p.cum.length - 1 && p.cum[i] < s) i++;
+    const a = p.pts[i - 1], b = p.pts[i];
+    const seg = (p.cum[i] - p.cum[i - 1]) || 1;
+    const k = Math.max(0, Math.min(1, (s - p.cum[i - 1]) / seg));
+    const x = a[0] + (b[0] - a[0]) * k;
+    const y = a[1] + (b[1] - a[1]) * k;
+    f.el.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
+    f.el.setAttribute('opacity', (Math.sin(Math.PI * Math.min(1, Math.max(0, f.t))) * 0.95).toFixed(2));
+  }
+}
+
+function tickFlow() {
+  for (const f of flowParts) {
+    f.t += f.sp * 0.04;
+    if (f.t >= 1) {
+      f.t = 0;
+      f.p = flowPaths[Math.floor(Math.random() * flowPaths.length)];
+    }
+  }
+  placeFlow();
+  tickMotes();
+}
+
+// 树冠里的光尘：缓慢上下浮，明暗也跟着呼吸
+let gMotes = null, motes = [];
+function buildMotes() {
+  if (!gMotes) return;
+  gMotes.replaceChildren();
+  motes = [];
+  for (let i = 0; i < 26; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.pow(Math.random(), 0.55) * 0.86;
+    const x = 800 + Math.cos(a) * 250 * r;
+    const y = 250 + Math.sin(a) * 130 * r;
+    const c = el('circle', {
+      cx: x, cy: y, r: 1 + Math.random() * 1.6,
+      fill: i % 3 ? '#dff0c8' : '#ffefc6', opacity: 0.3,
+    });
+    gMotes.appendChild(c);
+    motes.push({
+      el: c, y0: y,
+      amp: 4 + Math.random() * 10,
+      ph: Math.random() * Math.PI * 2,
+      sp: 0.25 + Math.random() * 0.5,
+      op: 0.18 + Math.random() * 0.3,
+    });
+  }
+}
+function tickMotes() {
+  const t = Date.now() / 1000;
+  for (const m of motes) {
+    m.el.setAttribute('cy', (m.y0 + Math.sin(t * m.sp + m.ph) * m.amp).toFixed(1));
+    m.el.setAttribute('opacity', (m.op * (0.55 + 0.45 * Math.sin(t * m.sp * 0.8 + m.ph))).toFixed(2));
+  }
+}
+
+// ── 一层：根系（几条粗根 + 挂在上面的月根）────────────────────────────
+// 不是每个月一根直插树干：先长 3~4 条粗根，月份从粗根的中段/末端分出来，
+// 周从月分出来，日从周分出来——一层套一层，才像树根。
+const monthNodes = [];
+function growMonths() {
+  document.getElementById('pulse')?.remove();
+  const ms = T.months, n = ms.length;
+  const labelItems = [];
+  flowPaths.length = 0;
+  registerFlow(TRUNK_PATH, true);
+  if (!n) return;
+
+  const nRoots = Math.min(4, Math.max(1, n));
+  // 按时间顺序把月份均匀分到几条粗根上
+  const buckets = Array.from({ length: nRoots }, () => []);
+  ms.forEach((m, i) => {
+    const r = Math.min(nRoots - 1, Math.floor(i * nRoots / n));
+    buckets[r].push({ m, i });
+  });
+
+  const mainTips = [];
+  for (let r = 0; r < nRoots; r++) {
+    const t = nRoots === 1 ? 0 : (r / (nRoots - 1)) * 2 - 1;   // -1..1
+    const RR = rng(r * 5.7 + 1);
+    const sx = CX + t * 24 + (RR() - 0.5) * 10;
+    const sy = ROOT_Y - 24;
+    const ang = Math.PI / 2 + t * (0.3 + 0.055 * nRoots) + (RR() - 0.5) * 0.26;
+    const len = (330 + 34 * Math.abs(t)) * (0.8 + RR() * 0.45) * (nRoots === 1 ? 1.3 : 1);
+    // 几条粗根粗细也要不一样，不然像批量生产的
+    const w0 = (74 / nRoots + (1 - Math.abs(t)) * 4) * (0.82 + RR() * 0.4);
+
+    const gMain = el('g', { 'pointer-events': 'none' });
+    const main = windingRoot(gMain, [sx, sy], ang, len, w0, 2.6, '#4a3421', {
+      seed: r * 5.1 + 3, steps: 36, hairs: 9, hairLen: 20, hairColor: '#4a341f', hairW: 1.2,
+      delay: r * 90, taper: nRoots === 1 ? 1.42 : 1.05, damp: 0.62,
+      wob: 0.32 + RR() * 0.22, grav: 0.015 + RR() * 0.05,
+      kink: 0.25 + RR() * 0.5, kinkDir: RR() < 0.5 ? -1 : 1, kinkAmt: 0.18 + RR() * 0.3,
+    });
+    gMain.appendChild(main.g);
+    gMonths.appendChild(gMain);
+    fadeRoot(main, r * 90, 620);
+    registerFlow(main.pts);
+    fadeRoot(main, r * 90, 620);
+    mainTips.push(main.end);
+
+    // 月根挂在这条粗根的中段到末端，左一个右一个
+    const list = buckets[r];
+    list.forEach(({ m, i }, k) => {
+      const R = rng(i * 3.1 + 11);
+      // 挂点、左右、角度、长度都抖一点，别摆成一排
+      const at = Math.min(0.95, (list.length === 1 ? 0.74 : 0.46 + 0.48 * ((k + 0.5) / list.length)) + (R() - 0.5) * 0.1);
+      const pi = Math.max(1, Math.min(main.pts.length - 2, Math.round(at * (main.pts.length - 1))));
+      const p0 = main.pts[pi - 1], p1 = main.pts[pi + 1];
+      const dx = p1[0] - p0[0], dy = p1[1] - p0[1];
+      const L = Math.hypot(dx, dy) || 1;
+      const nx = -dy / L, ny = dx / L;
+      const side = t === 0 ? (k % 2 ? 1 : -1) : Math.sign(t);
+      // 粗根在这一点上的宽度（估的，够用）
+      const wide = w0 * Math.pow(1 - at, 1.05) + 2.6 * (1 - at);
+      const base = [main.pts[pi][0] + nx * side * wide * 0.32, main.pts[pi][1] + ny * side * wide * 0.32];
+      const tangent = Math.atan2(dy, dx);
+      const angle = tangent + side * (0.62 + R() * 0.62);
+      const len2 = (108 + Math.min(42, m.events / 90)) * (0.78 + R() * 0.5);
+      const w02 = Math.max(4.5, (wide * 0.36 + Math.min(3.5, m.events / 900)) * (0.8 + R() * 0.45));
+
+      const g = el('g', { class: 'node' });
+      const root = windingRoot(g, base, angle, len2, w02, 0.8, '#7a5c3c', {
+        seed: i * 3.7 + 2, steps: 26, hairs: 6, hairLen: 14, hairColor: '#654a2f', hairW: 1.1,
+        delay: i * 45, damp: 0.9, wob: 0.42 + R() * 0.3, grav: 0.01 + R() * 0.05,
+        taper: 1.15, kink: 0.2 + R() * 0.6, kinkDir: R() < 0.5 ? -1 : 1, kinkAmt: 0.15 + R() * 0.3,
+      });
+      g.appendChild(root.g);
+      fadeRoot(root, 260 + i * 45, 620);
+
+      const tip = root.end;
+      const [ux, uy] = endDir(root.pts);
+      const off = n >= 8 ? 32 : 34;
+      g.append(el('circle', { cx: tip[0], cy: tip[1], r: 34, class: 'hit' }));
+      const li = makeLabel(g, n >= 8 ? m.label : m.label + ' · ' + m.weeks.length + ' 周',
+        tip[0] + ux * off, tip[1] + uy * off, 'lbl big', n >= 8 ? 12.5 : 14, true);
+      li.lbl.style.opacity = FAST ? 1 : 0;
+      const ar = arrowBtn(() => openSummary(m.label, m.weeks.length + ' 周 · ' + m.events + ' 条', m.summary));
+      if (n >= 8) ar.classList.add('quiet');
+      li.ar = ar;
+      if (!FAST) ar.style.opacity = 0;
+      g.appendChild(ar);
+      g.addEventListener('click', (ev) => { ev.stopPropagation(); openMonth(m, i); });
+      hoverTip(g, m.label + ' · ' + m.weeks.length + ' 周 · ' + m.events + ' 条');
+      gMonths.appendChild(g);
+
+      monthNodes.push({ m, ex: tip[0], ey: tip[1], angle, len: len2, i, lblIt: li, pts: root.pts, w0: w02, g });
+      registerFlow(root.pts);
+      if (!FAST) setTimeout(() => (li.lbl.style.opacity = 1), 900 + i * 60);
+      labelItems.push(li);
+    });
+  }
+
+  separate(labelItems);
+
+  // 根长在树干「后面」——交界被树干挡住，看不出接缝
+  if (trunkNode && trunkNode.parentNode === gTree) gTree.insertBefore(gMonths, trunkNode);
+  else svg.appendChild(gMonths);
+
+  buildFlow();
+
+  // 取景：根颈 + 粗根末端 + 月根末端与标签
+  focusBox([[CX, ROOT_Y - 60]].concat(mainTips, monthNodes.map((x) => [x.ex, x.ey])), labelItems, 1.03, 900, 460);
+}
+
+// ── 二层：周根 ────────────────────────────────────────────────────────
+let weekNodes = [];
+
+// 周根的几何：挂点按时间顺序排在月根上，端点落在月根末端的扇形里。
+// 月层画「细根」和点进月层后画真分支共用这一份，形状才不会跳。
+function weekSlots(m, anchor) {
+  const n = m.weeks.length;
+  return m.weeks.map((w, j) => {
+    const R = rng(j * 4.3 + 17);
+    // 挂在月根中段到末端，左一个右一个地分出去（和月根挂粗根是同一套规则）
+    const at = Math.min(0.95, (n === 1 ? 0.72 : 0.3 + 0.58 * ((j + 0.5) / n)) + (R() - 0.5) * 0.12);
+    const pi = Math.max(1, Math.min(anchor.pts.length - 2, Math.round(at * (anchor.pts.length - 1))));
+    const p0 = anchor.pts[pi - 1];
+    const p1 = anchor.pts[pi + 1];
+    const dx = p1[0] - p0[0];
+    const dy = p1[1] - p0[1];
+    const L = Math.hypot(dx, dy) || 1;
+    const nx = -dy / L, ny = dx / L;
+    const side = n > 1 ? (j % 2 ? 1 : -1) : (anchor.ex < CX ? -1 : 1);
+    const wide = Math.max(6, anchor.w0);
+    const base = [anchor.pts[pi][0] + nx * side * wide * 0.3, anchor.pts[pi][1] + ny * side * wide * 0.3];
+    const tangent = Math.atan2(dy, dx);
+    const angle = tangent + side * (0.6 + R() * 0.6);
+    const len = (94 + Math.min(44, w.events / 40)) * (0.78 + R() * 0.48);
+    const w0 = Math.max(2.8, anchor.w0 * 0.55 * (0.8 + R() * 0.4));
+    const ex = base[0] + Math.cos(angle) * len;
+    const ey = base[1] + Math.sin(angle) * len;
+    return { w, j, at, base, angle, len, ex, ey, w0, unit: side };
+  });
+}
+
+function openMonth(m, idx) {
+  const anchor = monthNodes[idx];
+  state = { level: 2, month: m, week: null };
+  setLabels(monthNodes.map((x) => x.lblIt), true);
+  // 打开的那个月，标签正好落在周根分叉之间，收起来（面包屑里还有月份）
+  for (const mn of monthNodes) if (mn.i === idx) setLabels([mn.lblIt], false);
+  for (const mn of monthNodes) {
+    mn.lblIt.lbl.classList.toggle('dim', mn.i !== idx);
+    if (mn.lblIt.ar) {
+      mn.lblIt.ar.style.opacity = mn.i === idx ? 1 : 0;
+      mn.lblIt.ar.style.pointerEvents = mn.i === idx ? '' : 'none';
+    }
+    // 其余月份直接压到几乎看不见——12 个月时不然整屏都是别人的根
+    if (mn.g) { mn.g.style.transition = 'opacity .5s'; mn.g.style.opacity = mn.i === idx ? 1 : 0.07; }
+    if (mn.ghost) mn.ghost.style.display = mn.i === idx ? 'none' : '';
+  }
+  setLabels(weekNodes.map((x) => x.lblIt), false);
+
+  gWeeks.replaceChildren();
+  weekNodes = [];
+  const labelItems = [];
+
+  // 挂点沿根的顺序排（时间顺序），但每根从母根「自己那一侧」出来：
+  // 左边的周根从根的左缘长，右边的从右缘长——起点顺序和扇位顺序一致，就不会交叉
+  const slots = weekSlots(m, anchor);
+
+  slots.forEach((slot, k) => {
+    const w = slot.w;
+    const j = slot.j;
+    const at = slot.at;
+    const base = slot.base;
+    const ex = slot.ex;
+    const ey = slot.ey;
+    const angle = slot.angle;
+    const len = slot.len;
+    const w0 = slot.w0;
+
+    const g = el('g', { class: 'node' });
+    const root = windingRoot(g, base, angle, len, w0, 0.9, '#7d5f3f', {
+      seed: j * 4.3 + 2, steps: 30, hairs: 6, hairLen: 15, hairColor: '#6a4f33', hairW: 1.2,
+      delay: j * 120, wob: 0.42 + (j % 3) * 0.08, grav: 0.015 + (j % 4) * 0.012,
+      kink: 0.2 + (j % 5) * 0.13, kinkDir: j % 2 ? 1 : -1, kinkAmt: 0.16 + (j % 3) * 0.08,
+    });
+
+    g.appendChild(root.g);
+    fadeRoot(root, j * 120, 720);
+
+    const tip = root.end;
+    const [ux, uy] = endDir(root.pts);
+    const wlx = tip[0] + ux * 28;
+    const wly = tip[1] + uy * 28;
+    g.append(el('circle', { cx: tip[0], cy: tip[1], r: 28, class: 'hit' }));
+    const li = makeLabel(g, w.key.slice(5) + ' · ' + w.days.length + '天', wlx, wly, 'lbl', 13, true);
+    li.lbl.style.opacity = FAST ? 1 : 0;
+    const war = arrowBtn(() => openSummary(w.label, w.days.length + ' 天 · ' + w.events + ' 条', w.summary));
+    li.ar = war;
+    g.appendChild(war);
+    g.addEventListener('click', (ev) => { ev.stopPropagation(); openWeek(w, angle, tip); });
+    hoverTip(g, w.label + ' · ' + w.days.length + ' 天 · ' + w.events + ' 条');
+    gWeeks.appendChild(g);
+
+    weekNodes.push({ w, ex: tip[0], ey: tip[1], angle, lblIt: li, g });
+    if (!FAST) setTimeout(() => (li.lbl.style.opacity = 1), j * 120 + 780);
+    labelItems.push(li);
+  });
+
+  if (!gWeeks.parentNode) svg.appendChild(gWeeks);
+  separate(labelItems);
+  // 把月根的起点也框进去，不然镜头会怼在周根上、把月根截掉
+  const pts = weekNodes.map((x) => [x.ex, x.ey]).concat([anchor.pts[0], [anchor.ex, anchor.ey]]);
+  focusBox(pts, labelItems, 1.02, 820, 420);
+  updateCrumb();
+  hint('点一条<b>周根</b>，看这一周');
+}
+
+// ── 三层：日根 ────────────────────────────────────────────────────────
+const TODAY = T.today;
+
+function openWeek(w, ang, origin) {
+  state = { level: 3, month: state.month, week: w };
+  gDays.replaceChildren();
+  for (const wn of weekNodes) {
+    wn.lblIt.lbl.classList.add('dim');
+    if (wn.g) wn.g.style.opacity = wn.w === w ? 1 : 0.07;
+  }
+  for (const mn of monthNodes) mn.lblIt.lbl.classList.add('dim');
+  // 进到日层，上层的字和箭头全收起来——这一层的画面只属于这几天
+  setLabels(monthNodes.map((x) => x.lblIt), false);
+  setLabels(weekNodes.map((x) => x.lblIt), false);
+
+  const n = w.days.length;
+  // 日根沿周根末端均匀张成一条弧带，不再从一个点炸开
+  const span = n <= 1 ? 0 : Math.min(2.05, 0.28 * n + 0.4);
+  const tips = [], labelItems = [];
+
+  w.days.forEach((d, j) => {
+    const t = n === 1 ? 0 : (j / (n - 1)) * 2 - 1;
+    const angle = ang + t * (span / 2);
+    const len = 100 + Math.min(60, d.events / 20);
+    const color = d.tier === 'deep' ? '#d8a24a' : d.tier === 'faint' ? '#4e5764' : '#8fa0ae';
+    const w0 = d.tier === 'deep' ? 3.8 : 2.6;
+    const isToday = d.key === TODAY;
+    // 起点各自往外错开一点，根部不会糊成一团
+    const base = [origin[0] + Math.cos(angle) * 9, origin[1] + Math.sin(angle) * 9];
+
+    const g = el('g', { class: 'node' });
+    const root = windingRoot(g, base, angle, len, w0, 0.45, color, {
+      seed: j * 2.9 + 5, steps: 20, hairs: 1, hairLen: 8, hairColor: color, hairW: 0.9,
+      delay: j * 40, opacity: d.tier === 'faint' ? 0.55 : 1,
+    });
+    fadeRoot(root, j * 40, 480);
+    g.insertBefore(root.g, g.firstChild);
+
+    const tip = root.end;
+    tips.push(tip);
+    g.append(el('circle', { cx: tip[0], cy: tip[1], r: 17, class: 'hit' }));
+    if (isToday) {
+      g.append(
+        el('circle', { cx: tip[0], cy: tip[1], r: 10, class: 'today-ring' }),
+        el('circle', { cx: tip[0], cy: tip[1], r: 3, fill: '#7fd6b4', 'pointer-events': 'none' }),
+      );
+    }
+    const [ux, uy] = endDir(root.pts);
+    const li = makeLabel(g, d.day + (d.tier === 'deep' ? ' ★' : ''),
+      tip[0] + ux * 22, tip[1] + uy * 22,
+      'lbl daylbl' + (d.tier === 'deep' ? ' deep' : '') + (isToday ? ' today' : ''), 12.5);
+    li.lbl.style.opacity = FAST ? 1 : 0;
+    if (!FAST) setTimeout(() => (li.lbl.style.opacity = 1), 380 + j * 40);
+    labelItems.push(li);
+    g.addEventListener('click', (ev) => { ev.stopPropagation(); openDay(d); });
+    hoverTip(g, d.key + ' ' + d.wd + ' · ' + d.events + ' 条 · ' + (TIER[d.tier] || d.tier) + (isToday ? ' · 今天' : ''));
+    gDays.appendChild(g);
+  });
+
+  if (!gDays.parentNode) svg.appendChild(gDays);
+  separate(labelItems);
+  focusBox(tips.concat([origin]), labelItems, 1.0, 660, 400);
+  updateCrumb();
+  hint('点一个<b>日根</b>，看那天的完整记录');
+}
+
+// ── 详情 ──────────────────────────────────────────────────────────────
+const panel = document.getElementById('panel');
+const TIER = { deep: '深刻', normal: '普通', faint: '淡忘' };
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function openDay(d) {
+  if (FAST) panel.style.transition = 'none';
+  document.getElementById('p-title').textContent = d.key + ' ' + d.wd;
+  document.getElementById('p-meta').textContent =
+    d.events + ' 条 · ' + d.sessions + ' 个会话 · ' + (TIER[d.tier] || d.tier);
+
+  const body = document.getElementById('p-body');
+  body.replaceChildren();
+  const add = (html) => { const w = document.createElement('div'); w.innerHTML = html; body.appendChild(w); };
+  const sec = (t) => { const h = document.createElement('div'); h.className = 'sec'; h.textContent = t; body.appendChild(h); };
+
+  if (d.terms.length) add(d.terms.map((x) => '<span class="tag">' + esc(x) + '</span>').join(''));
+  if (d.sess.length) {
+    sec('会话');
+    add(d.sess.map((s) => '<span class="tag">' + esc(s.name) + ' <b>' + s.n + '</b></span>').join(''));
+  }
+  if (d.users.length) {
+    sec('你说了 ' + d.users.length + ' 条');
+    add(d.users.map((u) => '<div class="row"><time>' + u.t + '</time><span class="me">' + esc(u.x) + '</span></div>').join(''));
+  }
+  if (d.ai.length) {
+    sec('我说了 ' + d.ai.length + ' 条');
+    add(d.ai.map((u) => '<div class="row"><time>' + u.t + '</time><span class="ai">' + esc(u.x) + '</span></div>').join(''));
+  }
+  panel.classList.add('open');
+  document.body.classList.add('panel-open');
+}
+
+document.getElementById('close').onclick = () => {
+  panel.classList.remove('open');
+  document.body.classList.remove('panel-open');
+};
+
+function openSummary(title, meta, text) {
+  if (FAST) panel.style.transition = 'none';
+  document.getElementById('p-title').textContent = title;
+  document.getElementById('p-meta').textContent = meta;
+
+  const body = document.getElementById('p-body');
+  body.replaceChildren();
+  const add = (html) => { const w = document.createElement('div'); w.innerHTML = html; body.appendChild(w); };
+  const sec = (t) => { const h = document.createElement('div'); h.className = 'sec'; h.textContent = t; body.appendChild(h); };
+
+  if (!text) add('<div class="sec">这一段的汇总还没生成</div>');
+  else {
+    for (const raw of text.split('\n')) {
+      const line = raw.trimEnd();
+      if (line.startsWith('## ')) sec(line.slice(3));
+      else if (line.startsWith('- ')) add('<div class="row"><span class="me">' + esc(line.slice(2)) + '</span></div>');
+      else if (line.trim()) add('<div class="row"><span class="ai">' + esc(line) + '</span></div>');
+    }
+  }
+  panel.classList.add('open');
+  document.body.classList.add('panel-open');
+}
+
+// ── 导航 ──────────────────────────────────────────────────────────────
+function updateCrumb() {
+  const c = document.getElementById('crumb');
+  if (state.level === 0) c.innerHTML = '';
+  else if (state.level === 1) c.innerHTML = '<b>' + T.year + '</b> · 根系';
+  else if (state.level === 2) c.innerHTML = '<b>' + T.year + '</b> · <b>' + state.month.label + '</b>';
+  else c.innerHTML = '<b>' + T.year + '</b> · <b>' + state.month.label + '</b> · <b>' + state.week.label + '</b>';
+  document.getElementById('back').classList.toggle('on', state.level > 0);
+}
+
+function hint(html) {
+  const h = document.getElementById('hint');
+  h.style.opacity = 1;
+  h.innerHTML = html;
+}
+
+const HOME_VIEW = () => focus(CX - 470, 40, CX + 470, GROUND_Y + 30, 1.06);
+
+function reset() {
+  state = { level: 0, month: null, week: null };
+  gMonths.remove(); gWeeks.remove(); gDays.remove();
+  panel.classList.remove('open');
+  document.body.classList.remove('panel-open');
+  monthNodes.length = 0; weekNodes = [];
+  flowPaths.length = 0;
+  if (flowTimer) { clearInterval(flowTimer); flowTimer = null; }
+  flowParts = [];
+  if (gFlow) gFlow.replaceChildren();
+  tipEl.classList.remove('on');
+  HOME_VIEW();
+  updateCrumb();
+  hint('点一下<b>树干</b>，让它长出根');
+}
+
+document.getElementById('back').onclick = (e) => { e.stopPropagation(); reset(); };
+
+// 全览 / 根系：镜头直接拉到能看全的尺度
+function viewAll() {
+  state.level = 1;
+  state.month = null;
+  state.week = null;
+  if (!gMonths.parentNode) growMonths();
+  gWeeks.remove();
+  gDays.remove();
+  weekNodes = [];
+  for (const mn of monthNodes) mn.lblIt.lbl.classList.remove('dim');
+  setLabels(monthNodes.map((x) => x.lblIt), true);
+  const xs = monthNodes.map((n) => n.ex).concat([CX - 430, CX + 430]);
+  const ys = monthNodes.map((n) => n.ey).concat([40]);
+  focus(Math.min(...xs) - 90, 20, Math.max(...xs) + 90, Math.max(...ys) + 90, 1.0);
+  updateCrumb();
+  hint('整棵树 · 全部月根');
+}
+
+function viewRoots() {
+  state.level = 1;
+  state.month = null;
+  state.week = null;
+  if (!gMonths.parentNode) growMonths();
+  gWeeks.remove();
+  gDays.remove();
+  weekNodes = [];
+  for (const mn of monthNodes) mn.lblIt.lbl.classList.remove('dim');
+  setLabels(monthNodes.map((x) => x.lblIt), true);
+  focusBox([[CX, ROOT_Y - 60]].concat(monthNodes.map((n) => [n.ex, n.ey])),
+    monthNodes.map((n) => n.lblIt), 1.0, 780, 320);
+  updateCrumb();
+  hint('点一条<b>月根</b>，看这个月怎么过');
+}
+
+// 今天：直接钻到最近一天
+function gotoToday() {
+  const mi = T.months.length - 1;
+  if (mi < 0) return;
+  const m = T.months[mi];
+  state.level = 1;
+  if (!gMonths.parentNode) growMonths();
+  gDays.remove();
+  openMonth(m, mi);
+  const wi = m.weeks.length - 1;
+  if (wi < 0) return;
+  const w = m.weeks[wi];
+  const wn = weekNodes[wi];
+  if (!wn) return;
+  openWeek(w, wn.angle, [wn.ex, wn.ey]);
+  const d = w.days.find((x) => x.key === TODAY) || w.days[w.days.length - 1];
+  if (d) setTimeout(() => openDay(d), 520);
+}
+
+document.getElementById('t-all').onclick = (e) => { e.stopPropagation(); viewAll(); };
+document.getElementById('t-roots').onclick = (e) => { e.stopPropagation(); viewRoots(); };
+document.getElementById('t-today').onclick = (e) => { e.stopPropagation(); gotoToday(); };
+document.getElementById('t-top').onclick = (e) => { e.stopPropagation(); reset(); };
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (panel.classList.contains('open')) {
+      panel.classList.remove('open');
+      document.body.classList.remove('panel-open');
+    } else reset();
+  }
+});
+
+stage.addEventListener('click', () => {
+  if (state.level !== 0) return;
+  state.level = 1;
+  document.getElementById('pulse')?.remove();
+  growMonths();
+  updateCrumb();
+  hint('点一条<b>月根</b>，看这个月怎么过');
+});
+
+// ── 初始化 ────────────────────────────────────────────────────────────
+drawTree();
+document.title = IS_DEMO ? '记忆之树 · 演示' : '记忆之树';
+document.getElementById('stat').textContent =
+  T.total + ' 条 · ' + T.days + ' 天 · ' + (T.first || '') + ' ~ ' + (T.last || '');
+document.getElementById('facts').innerHTML =
+  (T.threads.length ? '<div class="t">未结</div>' + T.threads.map((t) => '<div class="f">' + esc(t.title) + '</div>').join('') : '') +
+  (T.facts.length ? '<div class="t" style="margin-top:10px">记住</div>' + T.facts.map((f) => '<div class="f">' + esc(f.value) + '</div>').join('') : '');
+
+// 演示版 / 真实数据：换查询参数重新载入，数据本来就在这一张页面里
+const demoBtn = document.getElementById('t-demo');
+if (DATA.demo) {
+  demoBtn.textContent = IS_DEMO ? '真实数据' : '演示版';
+  demoBtn.title = IS_DEMO ? '切回真实记忆库' : '切到 12 个月的演示数据';
+  demoBtn.onclick = (event) => {
+    event.stopPropagation();
+    location.href = location.pathname + (IS_DEMO ? '' : '?demo=1') + location.hash;
+  };
+} else {
+  demoBtn.style.display = 'none';
+}
+HOME_VIEW();
+updateCrumb();
+stage.classList.add('ready');
+addEventListener('resize', () => { if (state.level === 0) HOME_VIEW(); });
+
+// 地址栏直达：#L1 根 / #L2 周 / #L3 日 / #P 详情 / #S 月汇总 / #A 自动点一次（测动画）
+if (location.hash.slice(1) === 'A') setTimeout(() => stage.click(), 500);
+
+// 测试用：先点树干，再在月根末端做一次真实点击（走 elementFromPoint，能验证有没有被上层挡住）
+if (location.hash.slice(1) === 'AA') {
+  setTimeout(() => {
+    stage.click();
+    setTimeout(() => {
+      const hit = gMonths.querySelector('.hit');
+      if (!hit) return;
+      const r = hit.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      const top = document.elementFromPoint(x, y);
+      (top || hit).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    }, 2000);
+  }, 300);
+}
+if (FAST) {
+  const h = location.hash.slice(1);
+  state.level = 1;
+  growMonths();
+  updateCrumb();
+  const mi = T.months.length - 1;
+
+  if (h === 'V') {
+    viewAll();
+  } else if (h === 'T') {
+    gotoToday();
+  } else if (h === 'S' && T.months[mi]) {
+    const m = T.months[mi];
+    openSummary(m.label, m.weeks.length + ' 周 · ' + m.events + ' 条', m.summary);
+  } else if (h !== 'L1' && T.months[mi]) {
+    openMonth(T.months[mi], mi);
+    const w = T.months[mi].weeks[T.months[mi].weeks.length - 1];
+    if (h !== 'L2' && w) {
+      const wn = weekNodes[weekNodes.length - 1];
+      openWeek(w, wn.angle, [wn.ex, wn.ey]);
+      if (h === 'P') openDay(w.days[w.days.length - 1]);
+    }
+  }
+}
+</script>
+</body>
+</html>

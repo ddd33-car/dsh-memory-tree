@@ -1,0 +1,22 @@
+{
+  "_comment": "遗忘参数。改这里就能调「记多久」——不用改代码。",
+  "thresholdMode": "percentile",
+  "_thresholds": "percentile 模式下，按显著度排名切：前 20% 深刻，随后 45% 普通，其余淡忘。想用绝对值就改成 fixed 并填下面两个数。",
+  "deepPct": 0.2,
+  "normalPct": 0.45,
+  "deepThreshold": 0.55,
+  "normalThreshold": 0.28,
+  "halfLifeDays": {
+    "_comment": "多少天后可召回度掉到一半。越大记得越牢。",
+    "deep": 365,
+    "normal": 45,
+    "faint": 10
+  },
+  "retentionDays": {
+    "_comment": "原文保留多少天。过期后原文进冷存，只留摘要卡片；冷存再过三倍时间才真删。",
+    "deep": 3650,
+    "normal": 540,
+    "faint": 90
+  },
+  "recallBoost": 1.15
+}

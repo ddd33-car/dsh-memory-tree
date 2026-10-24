@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Memory Tree",
+    "description": "Adds a Memory Tree button beside the session title; it opens the locally generated memory-tree page."
+  }
+}
