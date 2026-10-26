@@ -1,0 +1,20 @@
+# Copy this row into the profile's cordis.patch.yml, or edit the same fields in
+# the plugin manager's configuration form. Omit any key to take the default.
+- id: dsh-memory-tree
+  name: dsh-memory-tree
+  config:
+    # Where the database, cards, HTML page and log live.
+    # Default: ~/.dsh/memory
+    memoryDir: ~/.dsh/memory
+
+    # Automatic refresh interval in minutes. 0 turns the timer off
+    # (the panel's Refresh button still works).
+    refreshMinutes: 15
+
+    # Write the ten-line summary into ~/.dsh/AGENTS.md so the agent starts
+    # every new session already knowing you. Set false to keep that file clean.
+    digest: true
+
+    # Only needed when your DSH stores session logs somewhere other than
+    # ~/.dsh/sessions.
+    # sessionsDir: ~/.dsh/sessions

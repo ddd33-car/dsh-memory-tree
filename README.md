@@ -22,6 +22,20 @@ Everything stays on your machine. No server, no API calls, no model in the pipel
 | **Digest** | A ten-line summary written into `~/.dsh/AGENTS.md`, which DSH loads into every new session automatically. |
 | **Tree** | The page: a root system where the trunk is the year, the four thick roots are groups of months, and each month branches into weeks and days. Deep days glow gold, faint days dim. Click a day to read what was said. |
 
+## Quick start
+
+```text
+1. git clone https://github.com/ddd33-car/dsh-memory-tree.git
+2. In a running DSH, ask the agent: install the bundle at <that directory>
+   (or use the plugin manager's "install from a local directory")
+3. A "Memory tree" chip appears next to the session title. Click it.
+4. First open creates ~/.dsh/memory and collects your session logs in the background
+   (~3 s per 10k events). The page reloads itself when the tree is ready.
+5. Done. It refreshes every 15 minutes; the Refresh button in the panel runs one now.
+```
+
+Nothing to build, nothing to download at runtime, no account or API key.
+
 ## Requirements
 
 - **DeepSeek Harness** with third-party plugin support (Profile / bundle system). This is
@@ -30,6 +44,10 @@ Everything stays on your machine. No server, no API calls, no model in the pipel
   in 22.15) and the memory is the built-in `node:sqlite` (added in 22.5).
 
 No native modules, no build step, no `pnpm install` beyond what the plugin manager does.
+
+**Tested on Windows 11 with DSH Desktop.** Everything is plain Node (`os.homedir`,
+`path.join`, `node:zlib`, `node:sqlite`), so macOS and Linux should work, but I have not
+run it there — tell me if you do.
 
 ## Install
 
@@ -51,7 +69,7 @@ first run — otherwise the plugin starts a fresh one in the default location.
 
 ## Configuration
 
-Pass as the bundle's `config:` in the profile patch:
+Pass as the bundle's `config:` in the profile patch — a ready-to-copy block lives in [`examples/cordis.patch.yml`](examples/cordis.patch.yml):
 
 ```yaml
 - id: dsh-memory-tree
@@ -87,6 +105,26 @@ Nothing is overwritten after the first run.
   Direct link: `#LV`.
 - Hash routes for direct links: `#L1` roots, `#L2` weeks, `#L3` days, `#V` overview,
   `#T` today.
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| The panel says **"记忆之树还没有生成"** and never changes | The pipeline failed to run. Check Node: `node -v` must be ≥ 22.15. In DSH, open the panel once and look at the Host log; the error text is returned in the page too. |
+| The chip never appears | The bundle is installed but not active. Restart the Harness (Host plugins mount at startup; the Client half hot-reloads). |
+| The tree has only one or two roots | You have one or two months of session history — that is the data, not a bug. |
+| The tree is empty even though you use DSH daily | The plugin reads `~/.dsh/sessions`. If your DSH keeps logs elsewhere, set `sessionsDir`. |
+| The page loads but the day panel is blank | The day has no captured text (only tool calls). Cards are mechanical summaries. |
+| You do not want it touching `AGENTS.md` | Set `digest: false` and delete the `MEMORY:AUTO` block by hand once. |
+| After an update nothing changed | Host code needs a restart; the Client half alone hot-reloads. |
+
+The whole pipeline can also be run by hand, without the plugin, to see the error directly:
+
+```bash
+node src/refresh.mjs        # collect → digest → report
+node src/report.mjs         # page only
+node src/query.mjs status   # is there a database at all
+```
 
 ## Command line
 

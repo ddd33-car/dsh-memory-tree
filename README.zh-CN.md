@@ -21,6 +21,20 @@
 | **速览** | 十行摘要写进 `~/.dsh/AGENTS.md`，DSH 每个新会话自动加载。 |
 | **树** | 树干是年，四条粗根是月份分组，月分周、周分日。深刻的日子是金色带 ★，淡忘的压暗。点一天看那天的原文。 |
 
+## 五步开始
+
+```text
+1. git clone https://github.com/ddd33-car/dsh-memory-tree.git
+2. 在跑着的 DSH 里说：安装 <那个目录> 这个 bundle
+   （或者在插件管理器里选「从本地目录安装」）
+3. 会话标题旁边会出现「记忆之树」按钮，点它。
+4. 首次打开会自动建 ~/.dsh/memory，并在后台采集你的会话日志
+   （约每 1 万条约 3 秒）；生成完页面自己刷新。
+5. 之后每 15 分钟自动刷新一次，面板上的「刷新」按钮可以立刻跑一次。
+```
+
+不用构建、不下载任何东西、不需要账号或 API key。
+
 ## 要求
 
 - **DeepSeek Harness**，并且支持第三方插件（Profile / bundle 那套）。这是 DSH 插件，不是
@@ -29,6 +43,9 @@
   用的是内置 `node:sqlite`（22.5 起）。
 
 没有原生模块，没有构建步骤。
+
+**只在 Windows 11 + DSH Desktop 上实测过。** 代码都是纯 Node（`os.homedir`、`path.join`、
+`node:zlib`、`node:sqlite`），macOS 和 Linux 理论上能跑，但我没试——你试了告诉我。
 
 ## 安装
 
@@ -47,7 +64,7 @@ bundle」。不用构建。
 
 ## 配置
 
-在 profile 的 patch 里给这个 bundle 传 `config`：
+在 profile 的 patch 里给这个 bundle 传 `config`；可复制的模板在 [`examples/cordis.patch.yml`](examples/cordis.patch.yml)：
 
 ```yaml
 - id: dsh-memory-tree
@@ -78,6 +95,26 @@ bundle」。不用构建。
 - **列表视图**：演示按钮下面那个按钮，把树换成按天的平铺总览——统计、未结、记住的事，
   然后每天一行，可以展开看原文。直达链接 `#LV`。
 - 直达链接：`#L1` 根系、`#L2` 周、`#L3` 日、`#V` 全览、`#T` 今天。
+
+## 出问题先看这里
+
+| 现象 | 原因 / 怎么办 |
+|---|---|
+| 面板一直显示「记忆之树还没有生成」 | 采集没跑起来。先查 `node -v` 是否 ≥ 22.15；页面里会带上错误原文，Host 日志里也有。 |
+| 按钮根本没出现 | 装上了但没激活。重启 DSH（Host 端插件在启动时挂载，只有前端会热更新）。 |
+| 树只有一两根粗根 | 你的会话历史只有一两个月，这是数据本身，不是 bug。 |
+| 天天用 DSH 但树是空的 | 插件读的是 `~/.dsh/sessions`。日志在别处的话设 `sessionsDir`。 |
+| 页面能开，点某天右边空白 | 那天只记了工具调用，没有可读的对话；卡片是机械汇总。 |
+| 不想让它动 `AGENTS.md` | 设 `digest: false`，然后手动删掉 `MEMORY:AUTO` 那段。 |
+| 更新后没变化 | Host 端代码要重启才生效，前端单独改的才热更新。 |
+
+也可以完全绕开插件，手工跑一遍看真实报错：
+
+```bash
+node src/refresh.mjs        # 采集 → 速览 → 网页
+node src/report.mjs         # 只重建网页
+node src/query.mjs status   # 库到底建没建
+```
 
 ## 命令行
 
