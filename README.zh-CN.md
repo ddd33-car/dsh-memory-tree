@@ -23,15 +23,21 @@
 
 ## 要求
 
-- 支持第三方插件的 DeepSeek Harness（Profile / bundle 那套）。
-- **Node.js ≥ 22.5**——记忆库用的是内置 `node:sqlite`。
+- **DeepSeek Harness**，并且支持第三方插件（Profile / bundle 那套）。这是 DSH 插件，不是
+  独立应用，页面渲染在 Harness 的 Web UI 里。
+- **Node.js ≥ 22.15**——会话日志是 zstd 帧（`zlib.zstdDecompressSync`，22.15 才有），记忆库
+  用的是内置 `node:sqlite`（22.5 起）。
 
 没有原生模块，没有构建步骤。
 
 ## 安装
 
-用插件管理器从这个目录安装这个 bundle，或者在跑着的 Harness 里直接说「安装这个目录的
-bundle」。不用构建，也不用额外下载。
+```bash
+git clone https://github.com/ddd33-car/dsh-memory-tree.git
+```
+
+然后用插件管理器把这个目录装成 bundle，或者在跑着的 Harness 里直接说「安装这个目录的
+bundle」。不用构建。
 
 装好后会话标题旁边会出现 **记忆之树** 按钮，点开在中间面板显示。首次使用会自动建
 `~/.dsh/memory`、放三份默认配置、后台跑一次采集；页面生成完自己刷新。

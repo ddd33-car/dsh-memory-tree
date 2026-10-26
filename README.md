@@ -24,16 +24,21 @@ Everything stays on your machine. No server, no API calls, no model in the pipel
 
 ## Requirements
 
-- DeepSeek Harness with third-party plugin support (Profile / bundle system).
-- **Node.js ≥ 22.5** — the memory uses the built-in `node:sqlite`.
+- **DeepSeek Harness** with third-party plugin support (Profile / bundle system). This is
+  a DSH plugin, not a standalone app — it renders inside the Harness Web UI.
+- **Node.js ≥ 22.15** — the session logs are zstd frames (`zlib.zstdDecompressSync`, added
+  in 22.15) and the memory is the built-in `node:sqlite` (added in 22.5).
 
 No native modules, no build step, no `pnpm install` beyond what the plugin manager does.
 
 ## Install
 
-Install the bundle from this directory with the plugin manager — or, inside a running
-Harness, just ask the agent to install the bundle at that path. Nothing needs to be
-built or downloaded.
+```bash
+git clone https://github.com/ddd33-car/dsh-memory-tree.git
+```
+
+Then install that directory as a bundle with the plugin manager — or, inside a running
+Harness, just ask the agent to install the bundle at that path. Nothing needs to be built.
 
 A **Memory tree** chip appears next to the session title; it opens the page in the
 centre panel.
