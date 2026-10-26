@@ -1,5 +1,7 @@
 # dsh-memory-tree
 
+**English** ｜ [中文](README.zh-CN.md)
+
 A memory for [DeepSeek Harness](https://github.com/deepseek-ai) that you can *see*.
 
 It reads the session logs DSH already writes, turns them into a local SQLite memory,

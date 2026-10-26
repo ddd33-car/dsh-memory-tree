@@ -1,5 +1,7 @@
 # 记忆之树（dsh-memory-tree）
 
+[English](README.md) ｜ **中文**
+
 给 DeepSeek Harness 加一份**看得见**的记忆。
 
 它读 DSH 本来就在写的会话日志，存成本地 SQLite，按时间让它淡忘，最后画成一棵树：
