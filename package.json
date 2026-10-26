@@ -7,11 +7,11 @@
   "author": "dtr12",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dtr12/dsh-memory-tree.git"
+    "url": "git+https://github.com/DDD33-car/dsh-memory-tree.git"
   },
-  "homepage": "https://github.com/dtr12/dsh-memory-tree#readme",
+  "homepage": "https://github.com/DDD33-car/dsh-memory-tree#readme",
   "bugs": {
-    "url": "https://github.com/dtr12/dsh-memory-tree/issues"
+    "url": "https://github.com/DDD33-car/dsh-memory-tree/issues"
   },
   "keywords": [
     "dsh",
