@@ -4,6 +4,15 @@
   "description": "Memory tree for DeepSeek Harness: collects your session logs into a local SQLite memory, lets it fade with time, and renders it as a tree you can drill into.",
   "type": "module",
   "license": "MIT",
+  "author": "dtr12",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dtr12/dsh-memory-tree.git"
+  },
+  "homepage": "https://github.com/dtr12/dsh-memory-tree#readme",
+  "bugs": {
+    "url": "https://github.com/dtr12/dsh-memory-tree/issues"
+  },
   "keywords": [
     "dsh",
     "dsh-plugin",

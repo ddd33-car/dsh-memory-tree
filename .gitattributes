@@ -1,0 +1,7 @@
+# 任何平台都按 LF 存，避免 Windows 的 CRLF 污染 diff
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
