@@ -77,6 +77,9 @@ Nothing is overwritten after the first run.
 - **Deep / normal / faint** days are coloured gold / grey-blue / dark; deep days carry a ★.
 - `?demo=1` (or the button under the title) switches to a frozen 12-month sample, so the
   page can be shown without exposing a real memory.
+- **List view**: the button under *Demo* swaps the tree for a flat day-by-day overview —
+  stats, open threads, facts, then every day as one collapsible row. Same data, no tree.
+  Direct link: `#LV`.
 - Hash routes for direct links: `#L1` roots, `#L2` weeks, `#L3` days, `#V` overview,
   `#T` today.
 

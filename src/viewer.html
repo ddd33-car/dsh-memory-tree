@@ -31,11 +31,6 @@
   #hud{position:fixed;left:28px;top:24px;z-index:5;pointer-events:none}
   #hud h1{margin:0;font-size:15px;font-weight:600;letter-spacing:.14em;color:#c8d2df}
   #hud .sub{margin-top:6px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;letter-spacing:.03em}
-  #t-demo{position:fixed;left:28px;top:98px;z-index:6;background:rgba(17,24,32,.72);border:1px solid #232c38;
-          color:#a9b6c6;padding:5px 12px;border-radius:14px;font:inherit;font-size:12px;cursor:pointer;
-          transition:.18s;backdrop-filter:blur(6px);letter-spacing:.06em}
-  #t-demo:hover{background:#1b2431;color:#e6eef8;border-color:#334154}
-  body.panel-open #t-demo{opacity:0;pointer-events:none}
   #crumb{position:fixed;left:50%;top:24px;transform:translateX(-50%);z-index:5;
          font-size:12px;color:var(--dim);letter-spacing:.12em;pointer-events:none}
   #crumb b{color:#b3bfcd;font-weight:500}
@@ -54,6 +49,41 @@
         backdrop-filter:blur(6px)}
   #back:hover{background:#1a222c;color:#e3eaf2}
   #back.on{display:block}
+
+  /* 两个视图切换按钮：演示版 / 列表视图 */
+  #t-demo,#t-view{position:fixed;left:28px;z-index:8;background:rgba(17,24,32,.72);
+        border:1px solid #232c38;color:#a9b6c6;padding:5px 12px;border-radius:14px;
+        font:inherit;font-size:12px;cursor:pointer;transition:.18s;backdrop-filter:blur(6px);
+        letter-spacing:.06em}
+  #t-demo{top:98px}
+  #t-view{top:136px}
+  #t-demo:hover,#t-view:hover{background:#1b2431;color:#e6eef8;border-color:#334154}
+  body.panel-open #t-demo,body.panel-open #t-view{opacity:0;pointer-events:none}
+
+  /* 列表视图：按天铺开，和树是同一份数据 */
+  #listview{position:fixed;inset:0;z-index:7;background:#07090a;overflow-y:auto;
+            display:none;padding:44px 24px 90px}
+  #listview.on{display:block}
+  #listview .lv-wrap{max-width:900px;margin:0 auto}
+  #listview h2{margin:0 0 6px;font-size:18px;font-weight:600;color:#e6ecf4;letter-spacing:.02em}
+  #listview .lv-stat{font-size:12px;color:#6b7482;margin-bottom:26px;letter-spacing:.03em}
+  #listview .lv-sec{font-size:11px;letter-spacing:.14em;color:#5f6874;margin:24px 0 8px}
+  #listview .lv-fact{font-size:13px;color:#9fb0c2;padding:3px 0;line-height:1.6}
+  #listview .lv-day{border-top:1px solid #171d26;padding:11px 2px;cursor:pointer;transition:background .15s}
+  #listview .lv-day:hover{background:rgba(255,255,255,.025)}
+  #listview .lv-head{display:flex;align-items:baseline;gap:12px}
+  #listview .lv-date{font-size:13.5px;color:#cfd8e4;font-variant-numeric:tabular-nums;min-width:104px}
+  #listview .lv-meta{font-size:12px;color:#68727f;font-variant-numeric:tabular-nums}
+  #listview .lv-tier{font-size:11.5px;letter-spacing:.08em;margin-left:auto}
+  #listview .lv-tier.deep{color:#d8a24a}
+  #listview .lv-tier.normal{color:#7d8a99}
+  #listview .lv-tier.faint{color:#4e5764}
+  #listview .lv-body{display:none;padding:8px 0 4px 116px}
+  #listview .lv-day.open .lv-body{display:block}
+  #listview .lv-row{display:flex;gap:10px;font-size:12.5px;padding:3px 0;align-items:baseline}
+  #listview .lv-row time{color:#4f5967;font-size:11.5px;flex:0 0 auto;font-variant-numeric:tabular-nums}
+  #listview .lv-tag{display:inline-block;background:#151b23;border:1px solid #232c38;border-radius:6px;
+        padding:1px 8px;margin:0 5px 5px 0;font-size:11.5px;color:#8e99a8}
 
   #panel{position:fixed;top:0;right:0;height:100%;width:min(470px,92vw);z-index:8;
          background:linear-gradient(180deg,rgba(13,17,22,.97),rgba(8,10,13,.99));
@@ -137,6 +167,8 @@
   <div class="sub" id="stat"></div>
 </div>
 <button id="t-demo">演示版</button>
+<button id="t-view">列表视图</button>
+<div id="listview"><div class="lv-wrap" id="lv-wrap"></div></div>
 <div id="facts"></div>
 <div id="tip"></div>
 <div id="crumb"></div>
@@ -1173,6 +1205,14 @@ document.getElementById('t-today').onclick = (e) => { e.stopPropagation(); gotoT
 document.getElementById('t-top').onclick = (e) => { e.stopPropagation(); reset(); };
 addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    // 列表视图在最上层，先关它
+    const lv = document.getElementById('listview');
+    if (lv && lv.classList.contains('on')) {
+      lv.classList.remove('on');
+      const b = document.getElementById('t-view');
+      if (b) b.textContent = '列表视图';
+      return;
+    }
     if (panel.classList.contains('open')) {
       panel.classList.remove('open');
       document.body.classList.remove('panel-open');
@@ -1214,6 +1254,72 @@ HOME_VIEW();
 updateCrumb();
 stage.classList.add('ready');
 addEventListener('resize', () => { if (state.level === 0) HOME_VIEW(); });
+
+// ── 列表视图：按天铺开的那版总览，和树是同一份数据 ────────────────────
+const listEl = document.getElementById('listview');
+const lvWrap = document.getElementById('lv-wrap');
+const viewBtn = document.getElementById('t-view');
+let listBuilt = false;
+
+function buildList() {
+  if (listBuilt) return;
+  listBuilt = true;
+  const out = [];
+  const push = (s) => out.push(s);
+  push('<h2>记忆库 · 列表</h2>');
+  push('<div class="lv-stat">' + T.total + ' 条 · ' + T.days + ' 天 · ' + (T.first || '') + ' ~ ' + (T.last || '') + '</div>');
+  if (T.threads.length) {
+    push('<div class="lv-sec">未结</div>');
+    for (const th of T.threads) push('<div class="lv-fact">' + esc(th.title) + '</div>');
+  }
+  if (T.facts.length) {
+    push('<div class="lv-sec">记住</div>');
+    for (const f of T.facts) push('<div class="lv-fact">' + esc(f.value) + '</div>');
+  }
+
+  const days = [];
+  for (const m of T.months) for (const w of m.weeks) for (const d of w.days) days.push(d);
+  days.sort((a, b) => b.key.localeCompare(a.key));
+
+  push('<div class="lv-sec">全部 ' + days.length + ' 天（新的在前，点一行展开）</div>');
+  for (const d of days) {
+    const tier = TIER[d.tier] || d.tier;
+    const rows = [];
+    for (const u of d.users.slice(0, 8)) {
+      rows.push('<div class="lv-row"><time>' + u.t + '</time><span class="me">' + esc(u.x) + '</span></div>');
+    }
+    if (d.users.length > 8) rows.push('<div class="lv-row"><time></time><span class="ai">…另有 ' + (d.users.length - 8) + ' 条</span></div>');
+    for (const a of d.ai.slice(0, 4)) {
+      rows.push('<div class="lv-row"><time>' + a.t + '</time><span class="ai">' + esc(a.x) + '</span></div>');
+    }
+    const terms = d.terms.length
+      ? '<div style="margin:6px 0 2px">' + d.terms.map((t) => '<span class="lv-tag">' + esc(t) + '</span>').join('') + '</div>'
+      : '';
+    push(
+      '<div class="lv-day" data-k="' + d.key + '">' +
+        '<div class="lv-head">' +
+          '<span class="lv-date">' + d.key.slice(5) + ' ' + d.wd + '</span>' +
+          '<span class="lv-meta">' + d.events + ' 条 · ' + d.sessions + ' 会话</span>' +
+          '<span class="lv-tier ' + d.tier + '">' + tier + (d.tier === 'deep' ? ' ★' : '') + '</span>' +
+        '</div>' +
+        '<div class="lv-body">' + terms + rows.join('') + '</div>' +
+      '</div>',
+    );
+  }
+  lvWrap.innerHTML = out.join('');
+  lvWrap.addEventListener('click', (ev) => {
+    const row = ev.target.closest('.lv-day');
+    if (row) row.classList.toggle('open');
+  });
+}
+
+viewBtn.onclick = () => {
+  const on = listEl.classList.toggle('on');
+  viewBtn.textContent = on ? '树视图' : '列表视图';
+  if (on) buildList();
+};
+// 直达链接：#LV 打开列表视图
+if (location.hash.slice(1) === 'LV') setTimeout(() => viewBtn.click(), 120);
 
 // 地址栏直达：#L1 根 / #L2 周 / #L3 日 / #P 详情 / #S 月汇总 / #A 自动点一次（测动画）
 if (location.hash.slice(1) === 'A') setTimeout(() => stage.click(), 500);
